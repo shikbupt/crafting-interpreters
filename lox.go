@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"craftinginterpreters/lox/parser"
 	"craftinginterpreters/lox/scanner"
 	"flag"
 	"fmt"
@@ -61,13 +62,19 @@ func (l *Lox) RunFile(name string) {
 func (l *Lox) run(loxContext string) {
 	scanner := scanner.New()
 	tokens := scanner.ScanAll(loxContext)
-	for _, token := range tokens {
-		fmt.Println(token)
+
+	parsers := parser.NewParser(tokens)
+	expression, err := parsers.Parse()
+	if err != nil {
+		l.Error(err)
+		return
 	}
+
+	fmt.Print(parser.AstPrinter{}.Print(expression))
 }
 
-func (l *Lox) Error(line int, message string) {
-	l.report(line, "", message)
+func (l *Lox) Error(err error) {
+	fmt.Println(err)
 }
 
 func (l *Lox) report(line int, where, message string) {
