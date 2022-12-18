@@ -14,22 +14,22 @@ func (a AstPrinter) Print(expr Expr) string {
 	return expr.Accept(a).(string)
 }
 
-func (a AstPrinter) VisitorBinary(b *Binary) any {
+func (a AstPrinter) VisitBinaryExpr(b *Binary) any {
 	return a.parenthesize(b.Operator.Lexeme, b.Left, b.Right)
 }
 
-func (a AstPrinter) VisitorGrouping(g *Grouping) any {
+func (a AstPrinter) VisitGroupingExpr(g *Grouping) any {
 	return a.parenthesize("group", g.Expression)
 }
 
-func (a AstPrinter) VisitorLiteral(l *Literal) any {
+func (a AstPrinter) VisitLiteralExpr(l *Literal) any {
 	if l.Value == nil {
 		return "nil"
 	}
 	return fmt.Sprint(l.Value)
 }
 
-func (a AstPrinter) VisitorUnary(u *Unary) any {
+func (a AstPrinter) VisitUnaryExpr(u *Unary) any {
 	return a.parenthesize(u.Operator.Lexeme, u.Right)
 }
 

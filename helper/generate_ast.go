@@ -87,7 +87,7 @@ import(
 
 type Visitor interface{
 	{{- range .Types}}
-	Visitor{{.NodeName}}(*{{.NodeName}}) any
+	Visit{{.NodeName}}Expr(*{{.NodeName}}) any
 	{{- end}}
 }
 
@@ -103,7 +103,7 @@ type {{ .NodeName }} struct{
 }
 
 func (i *{{.NodeName}})Accept(v Visitor) any{
-	return v.Visitor{{.NodeName}}(i)
+	return v.Visit{{.NodeName}}Expr(i)
 }
 {{- end}}
 `
