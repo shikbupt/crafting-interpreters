@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"craftinginterpreters/lox/interpreter"
 	"craftinginterpreters/lox/parser"
 	"craftinginterpreters/lox/scanner"
 	"flag"
@@ -17,7 +18,7 @@ func main() {
 	if len(flag.Args()) == 0 {
 		panic("need input lox file")
 	}
-	lox := new(Lox)
+	lox := newLox()
 
 	if *promptFlag {
 		lox.RunPrompt()
@@ -26,7 +27,15 @@ func main() {
 }
 
 type Lox struct {
-	hadError bool
+	interpreter     *interpreter.Interpreter
+	hadError        bool
+	hadRuntimeError bool
+}
+
+func newLox() *Lox {
+	return &Lox{
+		interpreter: interpreter.NewInterpreter(),
+	}
 }
 
 func (l *Lox) RunPrompt() {
@@ -70,10 +79,22 @@ func (l *Lox) run(loxContext string) {
 		return
 	}
 
-	fmt.Print(parser.AstPrinter{}.Print(expression))
+	fmt.Println(parser.AstPrinter{}.Print(expression))
+	err = l.interpreter.Interpret(expression)
+	if err != nil {
+		l.runtimeError(err)
+		return
+	}
+
 }
 
 func (l *Lox) Error(err error) {
+	l.hadError = true
+	fmt.Println(err)
+}
+
+func (l *Lox) runtimeError(err error) {
+	l.hadRuntimeError = true
 	fmt.Println(err)
 }
 
