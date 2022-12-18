@@ -131,7 +131,7 @@ func (s *Scanner) string() {
 	}
 	s.advance()
 	value := s.source[s.start+1 : s.current-1]
-	s.addToken(STRING, value)
+	s.addToken(STRING, string(value))
 }
 
 func (s *Scanner) isDigit(c rune) bool {
