@@ -7,23 +7,28 @@ import (
 	"fmt"
 )
 
-var _ parser.Visitor = &Interpreter{}
+var _ parser.ExprVisitor = &Interpreter{}
+var _ parser.StmtVisitor = &Interpreter{}
 
 type Interpreter struct {
+	env *Environment
 }
 
 func NewInterpreter() *Interpreter {
-	return &Interpreter{}
+	return &Interpreter{
+		env: NewEnv(nil),
+	}
 }
 
-func (i *Interpreter) Interpret(expression parser.Expr) (err error) {
+func (i *Interpreter) Interpret(statements []parser.Stmt) (err error) {
 	defer func() {
 		if terr := recover(); terr != nil {
 			err = errors.New(terr.(string))
 		}
 	}()
-	value := i.evaluate(expression)
-	fmt.Println(value)
+	for _, statement := range statements {
+		i.evaluateStmt(statement)
+	}
 	return nil
 }
 
@@ -32,11 +37,11 @@ func (i *Interpreter) VisitLiteralExpr(l *parser.Literal) any {
 }
 
 func (i *Interpreter) VisitGroupingExpr(e *parser.Grouping) any {
-	return i.evaluate(e.Expression)
+	return i.evaluateExpr(e.Expression)
 }
 
 func (i *Interpreter) VisitUnaryExpr(u *parser.Unary) any {
-	right := i.evaluate(u.Right)
+	right := i.evaluateExpr(u.Right)
 
 	switch u.Operator.Type {
 	case scanner.BANG:
@@ -59,8 +64,8 @@ func (i *Interpreter) isTruthy(object any) bool {
 }
 
 func (i *Interpreter) VisitBinaryExpr(b *parser.Binary) any {
-	left := i.evaluate(b.Left)
-	right := i.evaluate(b.Right)
+	left := i.evaluateExpr(b.Left)
+	right := i.evaluateExpr(b.Right)
 
 	switch b.Operator.Type {
 	case scanner.GREATER:
@@ -105,11 +110,19 @@ func (i *Interpreter) VisitBinaryExpr(b *parser.Binary) any {
 	return nil
 }
 
+func (i *Interpreter) VisitVariableExpr(v *parser.Variable) any {
+	return i.env.get(v.Name)
+}
+
 func (i *Interpreter) isEqual(left, right any) bool {
 	return left == right
 }
 
-func (i *Interpreter) evaluate(expr parser.Expr) any {
+func (i *Interpreter) evaluateExpr(expr parser.Expr) any {
+	return expr.Accept(i)
+}
+
+func (i *Interpreter) evaluateStmt(expr parser.Stmt) any {
 	return expr.Accept(i)
 }
 
@@ -118,5 +131,47 @@ func (i *Interpreter) checkNumberOperand(operator scanner.Token, objects ...any)
 		if _, ok := object.(float64); !ok {
 			panic(fmt.Sprintf("[line %d ], Operand must be a number.", operator.Line))
 		}
+	}
+}
+
+func (i *Interpreter) VisitExpressionStmt(e *parser.Expression) any {
+	i.evaluateExpr(e.Expression)
+	return nil
+}
+
+func (i *Interpreter) VisitPrintStmt(p *parser.Print) any {
+	value := i.evaluateExpr(p.Expression)
+	fmt.Println(value)
+	return nil
+}
+
+func (i *Interpreter) VisitVarStmt(v *parser.Var) any {
+	var value any
+	if v.Initializer != nil {
+		value = i.evaluateExpr(v.Initializer)
+	}
+	i.env.define(v.Name.Lexeme, value)
+	return nil
+}
+
+func (i *Interpreter) VisitAssignExpr(a *parser.Assign) any {
+	value := i.evaluateExpr(a.Value)
+	i.env.assign(a.Name, value)
+	return value
+}
+
+func (i *Interpreter) VisitBlockStmt(b *parser.Block) any {
+	i.executeBlock(b.Statements, NewEnv(i.env))
+	return nil
+}
+
+func (i *Interpreter) executeBlock(statements []parser.Stmt, env *Environment) {
+	parentEnv := i.env
+	defer func() {
+		i.env = parentEnv
+	}()
+	i.env = env
+	for _, statement := range statements {
+		i.evaluateStmt(statement)
 	}
 }

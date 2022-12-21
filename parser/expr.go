@@ -5,15 +5,26 @@ import (
 	"craftinginterpreters/lox/scanner"
 )
 
-type Visitor interface {
+type ExprVisitor interface {
+	VisitAssignExpr(*Assign) any
 	VisitBinaryExpr(*Binary) any
 	VisitGroupingExpr(*Grouping) any
 	VisitLiteralExpr(*Literal) any
 	VisitUnaryExpr(*Unary) any
+	VisitVariableExpr(*Variable) any
 }
 
 type Expr interface {
-	Accept(Visitor) any
+	Accept(ExprVisitor) any
+}
+
+type Assign struct {
+	Name  scanner.Token
+	Value Expr
+}
+
+func (i *Assign) Accept(v ExprVisitor) any {
+	return v.VisitAssignExpr(i)
 }
 
 type Binary struct {
@@ -22,7 +33,7 @@ type Binary struct {
 	Right    Expr
 }
 
-func (i *Binary) Accept(v Visitor) any {
+func (i *Binary) Accept(v ExprVisitor) any {
 	return v.VisitBinaryExpr(i)
 }
 
@@ -30,7 +41,7 @@ type Grouping struct {
 	Expression Expr
 }
 
-func (i *Grouping) Accept(v Visitor) any {
+func (i *Grouping) Accept(v ExprVisitor) any {
 	return v.VisitGroupingExpr(i)
 }
 
@@ -38,7 +49,7 @@ type Literal struct {
 	Value any
 }
 
-func (i *Literal) Accept(v Visitor) any {
+func (i *Literal) Accept(v ExprVisitor) any {
 	return v.VisitLiteralExpr(i)
 }
 
@@ -47,6 +58,14 @@ type Unary struct {
 	Right    Expr
 }
 
-func (i *Unary) Accept(v Visitor) any {
+func (i *Unary) Accept(v ExprVisitor) any {
 	return v.VisitUnaryExpr(i)
+}
+
+type Variable struct {
+	Name scanner.Token
+}
+
+func (i *Variable) Accept(v ExprVisitor) any {
+	return v.VisitVariableExpr(i)
 }

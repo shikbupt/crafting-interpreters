@@ -18,72 +18,144 @@ func NewParser(t []scanner.Token) *Parser {
 	}
 }
 
-func (p *Parser) Parse() (res Expr, err error) {
+func (p *Parser) Parse() (res []Stmt, err error) {
 	defer func() {
 		if terr := recover(); terr != nil {
 			res = nil
 			err = terr.(error)
 		}
 	}()
-	res = p.expression()
-	return res, err
+	statements := make([]Stmt, 0)
+	for !p.isAtEnd() {
+		statements = append(statements, p.Declaration())
+	}
+	return statements, nil
 }
 
-func (p *Parser) expression() Expr {
-	return p.equality()
+func (p *Parser) Declaration() Stmt {
+	if p.match(scanner.VAR) {
+		return p.VarDeclaration()
+	}
+	return p.Statement()
 }
 
-func (p *Parser) equality() Expr {
-	expr := p.comparison()
+func (p *Parser) VarDeclaration() Stmt {
+	name := p.comsume(scanner.IDENTIFIER, "Expect variable name.")
+
+	var initializer Expr
+	if p.match(scanner.EQUAL) {
+		initializer = p.Expression()
+	}
+	p.comsume(scanner.SEMICOLON, "Expect ';' after variable declaration.")
+	return &Var{
+		Name:        name,
+		Initializer: initializer,
+	}
+}
+
+func (p *Parser) Expression() Expr {
+	return p.Assignment()
+}
+
+func (p *Parser) Assignment() Expr {
+	expr := p.Equality()
+	if p.match(scanner.EQUAL) {
+		equals := p.previous()
+		value := p.Assignment()
+		if v, ok := expr.(*Variable); ok {
+			name := v.Name
+			return &Assign{
+				Name:  name,
+				Value: value,
+			}
+		}
+		panic(fmt.Sprintf("%v Invalid assignment target.", equals))
+	}
+	return expr
+}
+
+func (p *Parser) Statement() Stmt {
+	if p.match(scanner.PRINT) {
+		return p.PrintStatement()
+	}
+	if p.match(scanner.LEFT_BRACE) {
+		return &Block{p.Block()}
+	}
+	return p.ExpressionStatement()
+}
+
+func (p *Parser) Block() []Stmt {
+	statements := make([]Stmt, 0)
+	for !p.isAtEnd() && !p.check(scanner.RIGHT_BRACE) {
+		statements = append(statements, p.Declaration())
+	}
+	p.comsume(scanner.RIGHT_BRACE, "Expect '}' after block.")
+	return statements
+}
+
+func (p *Parser) PrintStatement() Stmt {
+	value := p.Expression()
+	p.comsume(scanner.SEMICOLON, "Expect ';' after value.")
+	return &Print{value}
+}
+
+func (p *Parser) ExpressionStatement() Stmt {
+	value := p.Expression()
+	p.comsume(scanner.SEMICOLON, "Expect ';' after expression.")
+	return &Expression{value}
+}
+
+func (p *Parser) Equality() Expr {
+	expr := p.Comparison()
 
 	for p.match(scanner.BANG_EQUAL, scanner.EQUAL_EQUAL) {
 		operator := p.previous()
-		right := p.comparison()
+		right := p.Comparison()
 		expr = &Binary{expr, operator, right}
 	}
 	return expr
 }
 
-func (p *Parser) comparison() Expr {
-	expr := p.term()
+func (p *Parser) Comparison() Expr {
+	expr := p.Term()
 	for p.match(scanner.GREATER, scanner.GREATER_EQUAL, scanner.LESS, scanner.LESS_EQUAL) {
 		operator := p.previous()
-		right := p.term()
+		right := p.Term()
 		expr = &Binary{expr, operator, right}
 	}
 	return expr
 }
 
-func (p *Parser) term() Expr {
-	expr := p.factor()
+func (p *Parser) Term() Expr {
+	expr := p.Factor()
 	for p.match(scanner.MINUS, scanner.PLUS) {
 		operator := p.previous()
-		right := p.factor()
+		right := p.Factor()
 		expr = &Binary{expr, operator, right}
 	}
 	return expr
 }
 
-func (p *Parser) factor() Expr {
-	expr := p.unary()
+func (p *Parser) Factor() Expr {
+	expr := p.Unary()
 	for p.match(scanner.SLASH, scanner.STAR) {
 		operator := p.previous()
-		right := p.unary()
+		right := p.Unary()
 		expr = &Binary{expr, operator, right}
 	}
 	return expr
 }
 
-func (p *Parser) unary() Expr {
+func (p *Parser) Unary() Expr {
 	if p.match(scanner.BANG, scanner.MINUS) {
 		operator := p.previous()
-		right := p.unary()
+		right := p.Unary()
 		return &Unary{operator, right}
 	}
-	return p.primary()
+	return p.Primary()
 }
 
-func (p *Parser) primary() Expr {
+func (p *Parser) Primary() Expr {
 	switch {
 	case p.match(scanner.FALSE):
 		return &Literal{false}
@@ -93,8 +165,10 @@ func (p *Parser) primary() Expr {
 		return &Literal{nil}
 	case p.match(scanner.NUMBER, scanner.STRING):
 		return &Literal{p.previous().Literal}
+	case p.match(scanner.IDENTIFIER):
+		return &Variable{p.previous()}
 	case p.match(scanner.LEFT_PAREN):
-		expr := p.expression()
+		expr := p.Expression()
 		p.comsume(scanner.RIGHT_PAREN, "Expect ')' after expression.")
 		return &Grouping{expr}
 	}

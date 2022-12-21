@@ -24,7 +24,7 @@ func main() {
 
 	outputDir := flag.Arg(0)
 
-	types := astInput{
+	expr := astInput{
 		Split: func(a string) []string {
 			res := []string{}
 			for _, s := range strings.Split(a, ",") {
@@ -37,14 +37,36 @@ func main() {
 			NodeName      string
 			SubProduction string
 		}{
+			{"Assign", "Name scanner.Token, Value Expr"},
 			{"Binary", "Left Expr, Operator scanner.Token, Right Expr"},
 			{"Grouping", "Expression Expr"},
 			{"Literal", "Value any"},
 			{"Unary", "Operator scanner.Token, Right Expr"},
+			{"Variable", "Name scanner.Token"},
 		},
 	}
+	defineAst(outputDir, expr)
 
-	defineAst(outputDir, types)
+	stmt := astInput{
+		Split: func(a string) []string {
+			res := []string{}
+			for _, s := range strings.Split(a, ",") {
+				res = append(res, strings.TrimSpace(s))
+			}
+			return res
+		},
+		BaseName: "Stmt",
+		Types: []struct {
+			NodeName      string
+			SubProduction string
+		}{
+			{"Block", "Statements []Stmt"},
+			{"Expression", "Expression Expr"},
+			{"Print", "Expression Expr"},
+			{"Var", "Name scanner.Token, Initializer Expr"},
+		},
+	}
+	defineAst(outputDir, stmt)
 }
 
 type astInput struct {
@@ -84,15 +106,15 @@ package parser
 import(
 	"craftinginterpreters/lox/scanner"
 )
-
-type Visitor interface{
+{{- $BaseName := .BaseName}}
+type {{.BaseName}}Visitor interface{
 	{{- range .Types}}
-	Visit{{.NodeName}}Expr(*{{.NodeName}}) any
+	Visit{{.NodeName}}{{$BaseName}}(*{{.NodeName}}) any
 	{{- end}}
 }
 
 type {{.BaseName}} interface{
-	Accept(Visitor) any
+	Accept({{.BaseName}}Visitor) any
 }
 {{- $Split := .Split}}
 {{ range .Types }}
@@ -102,8 +124,8 @@ type {{ .NodeName }} struct{
 	{{- end}}
 }
 
-func (i *{{.NodeName}})Accept(v Visitor) any{
-	return v.Visit{{.NodeName}}Expr(i)
+func (i *{{.NodeName}})Accept(v {{$BaseName}}Visitor) any{
+	return v.Visit{{.NodeName}}{{$BaseName}}(i)
 }
 {{- end}}
 `

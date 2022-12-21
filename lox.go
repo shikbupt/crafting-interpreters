@@ -73,14 +73,13 @@ func (l *Lox) run(loxContext string) {
 	tokens := scanner.ScanAll(loxContext)
 
 	parsers := parser.NewParser(tokens)
-	expression, err := parsers.Parse()
+	statements, err := parsers.Parse()
 	if err != nil {
 		l.Error(err)
 		return
 	}
 
-	fmt.Println(parser.AstPrinter{}.Print(expression))
-	err = l.interpreter.Interpret(expression)
+	err = l.interpreter.Interpret(statements)
 	if err != nil {
 		l.runtimeError(err)
 		return

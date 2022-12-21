@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-var _ Visitor = AstPrinter{}
+var _ ExprVisitor = AstPrinter{}
 
 type AstPrinter struct {
 }
@@ -45,4 +45,12 @@ func (a AstPrinter) parenthesize(name string, exprs ...Expr) string {
 	builder.WriteString(")")
 
 	return builder.String()
+}
+
+func (a AstPrinter) VisitVariableExpr(v *Variable) any {
+	return nil
+}
+
+func (a AstPrinter) VisitAssignExpr(v *Assign) any {
+	return nil
 }
